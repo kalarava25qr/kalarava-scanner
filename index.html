@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Kalarava QR Scanner</title>
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCdrudfhVP6uGo9VzLjFztVmf4zoY2u1hI",
+  authDomain: "kalarava-25.firebaseapp.com",
+  databaseURL: "https://kalarava-25-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "kalarava-25",
+  storageBucket: "kalarava-25.firebasestorage.app",
+  messagingSenderId: "247264076411",
+  appId: "1:247264076411:web:51a116241f77313871f8de"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+window.markScan = async function(usn){
+  const r = ref(db,"attendance/"+usn);
+  const snap = await get(r);
+
+  if (snap.exists() && snap.val().scanned) return "DUPLICATE";
+
+  await set(r,{
+    scanned:true,
+    time: Date.now()
+  });
+
+  return "VALID";
+}
+</script>
+
+<style>
+body{margin:0;background:#000;color:#fff;font-family:Arial;text-align:center}
+h2{margin:12px;font-size:22px;color:#00ff99}
+#reader{width:90vw;max-width:350px;height:90vw;max-height:350px;margin:auto;border:3px solid #00ff99;border-radius:10px}
+#msg{margin-top:12px;font-size:20px;font-weight:bold}
+</style>
+</head>
+
+<body>
+<h2>🎉 KALARAVA 2025 ENTRY SCANNER</h2>
+<div id="reader"></div>
+<div id="msg">Scan QR</div>
+
+<script>
+const msg = document.getElementById("msg");
+
+function show(t,c){msg.style.background=c;msg.textContent=t;}
+function restart(){setTimeout(()=>{show("Scan QR","transparent");start();},1200);}
+
+async function onScan(qr){
+  show("Checking...","#222");
+  const result = await window.markScan(qr);
+
+  if(result==="VALID") show("✅ VALID","#009933");
+  else show("🚫 DUPLICATE","#cc0000");
+
+  restart();
+}
+
+function start(){
+  const qr=new Html5Qrcode("reader");
+  qr.start({facingMode:"environment"},{fps:12,qrbox:250},onScan);
+}
+
+start();
+</script>
+</body>
+</html>
