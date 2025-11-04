@@ -2,8 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Kalarava Entry Scanner</title>
-
+<title>Kalarava QR Scanner</title>
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <!-- Firebase -->
@@ -24,81 +23,86 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-window.verifyQR = async function(usn) {
-  const entryRef = ref(db, "attendance/" + usn);
-  const snap = await get(entryRef);
-  if (snap.exists()) return "DUPLICATE";
+window.checkEntry = async function (usn){
+  usn = usn.trim().toUpperCase();
+  const r = ref(db,"attendance/"+usn);
+  const snap = await get(r);
+  
+  if(snap.exists()) return "DUPLICATE";
 
-  await set(entryRef, { scanned: true, time: Date.now() });
+  await set(r,{ scanned:true, time: Date.now() });
   return "VALID";
 }
 </script>
 
 <style>
-body {
-  margin:0; background:#000; color:#fff;
-  font-family: Arial; text-align:center;
+body{background:#000;color:#fff;text-align:center;font-family:Arial;margin:0;padding-top:10px}
+h2{color:#00ff99;margin-bottom:10px}
+#scanner-box{
+  width:90vw; max-width:350px;
+  height:90vw; max-height:350px;
+  margin:auto;
+  border:4px solid #00ff99;
+  border-radius:10px;
 }
-h2 { color:#00ff99; margin:12px; font-size:22px; }
-#reader {
-  width: 90vw; max-width:350px;
-  height: 90vw; max-height:350px;
-  border: 4px solid #00ff99;
-  border-radius: 12px;
-  margin: auto; margin-top:10px;
-}
-#result {
-  margin-top: 12px;
-  font-size: 20px;
-  font-weight: bold;
-  padding: 12px;
-  border-radius: 8px;
-  min-height: 50px;
+#result{
+  margin-top:12px;
+  font-size:20px;
+  font-weight:bold;
+  padding:10px;
+  border-radius:8px;
+  min-height:50px;
 }
 </style>
 </head>
 
 <body>
-<h2>🎉 KALARAVA 2025 ENTRY SCANNER</h2>
-<div id="reader"></div>
-<div id="result">📷 Scan QR to Begin</div>
+<h2>KALARAVA 2025 ENTRY</h2>
+<div id="scanner-box"></div>
+<div id="result">Scan a QR</div>
 
 <script>
-const resultBox = document.getElementById("result");
+let scanner;
 
-function show(text,color="transparent") {
-  resultBox.style.background = color;
-  resultBox.textContent = text;
+function show(msg,color){
+  const box=document.getElementById("result");
+  box.style.background=color;
+  box.textContent=msg;
 }
 
-function restart() {
-  setTimeout(() => {
-    show("📷 Ready for next scan","transparent");
-    startScanner();
-  }, 1200);
+async function onScan(text){
+  // Stop scanning immediately to prevent flicker
+  await scanner.stop();
+  
+  show("Checking...","#444");
+
+  const res = await window.checkEntry(text);
+
+  if(res==="VALID") show("✅ VALID ENTRY","#008f39");
+  else if(res==="DUPLICATE") show("🚫 DUPLICATE","#b30000");
+  else show("❌ INVALID","#cc6600");
+
+  setTimeout(startScanner,1200); // restart after 1.2s
 }
 
-async function handleScan(qr){
-  show("⏳ Checking...", "#222");
-  const res = await window.verifyQR(qr);
-
-  if (res === "VALID") show("✅ VALID ENTRY", "#008f39");
-  else if (res === "DUPLICATE") show("🚫 ALREADY SCANNED", "#b30000");
-  else show("❌ INVALID QR", "#cc6600");
-
-  restart();
-}
-
-function startScanner() {
-  const qr = new Html5Qrcode("reader");
-  qr.start(
-    { facingMode:"environment" },
-    { fps:12, qrbox:{width:300,height:300}, aspectRatio:1.0 },
-    handleScan
+function startScanner(){
+  show("📷 Ready to scan","transparent");
+  scanner = new Html5Qrcode("scanner-box");
+  
+  scanner.start(
+    {facingMode:"environment"},
+    {
+      fps:10,
+      qrbox:{width:300,height:300},
+      aspectRatio:1.0,
+      disableFlip:true
+    },
+    onScan
   );
 }
 
 startScanner();
 </script>
+
 </body>
 </html>
