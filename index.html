@@ -1,178 +1,79 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>QR Entry — Exit System</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<!-- Libraries -->
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Kalarava QR Scanner</title>
 <script src="https://unpkg.com/html5-qrcode"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDQ7zrV4Ao9TdJwD0BBOm1Cn7oSL1gEM1A",
+  authDomain: "kalarava-scanner-52043.firebaseapp.com",
+  databaseURL: "https://kalarava-scanner-52043-default-rtdb.firebaseio.com",
+  projectId: "kalarava-scanner-52043",
+  storageBucket: "kalarava-scanner-52043.firebasestorage.app",
+  messagingSenderId: "550630251161",
+  appId: "1:550630251161:web:33391388bb3398167a3608"
+};
+
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+window.markScan = async function(usn){
+  const r = ref(db,"attendance/"+usn);
+  const snap = await get(r);
+
+  if (snap.exists() && snap.val().scanned) return "DUPLICATE";
+
+  await set(r,{
+    scanned:true,
+    time: Date.now()
+  });
+
+  return "VALID";
+}
+</script>
 
 <style>
-body{
-  margin:0;
-  background:#02050c;
-  color:white;
-  font-family:Arial;
-  text-align:center;
-}
-
-h2{margin-top:15px;}
-
-.counter{
-  background:#032b29;
-  padding:8px 14px;
-  border-radius:10px;
-  border:1px solid #00ffbf;
-  display:inline-block;
-  margin-bottom:10px;
-}
-
-/* Scanner wrapper square */
-#reader{
-  width:320px;
-  height:320px;
-  margin:auto;
-  position:relative;
-  background:black;
-  border-radius:12px;
-  overflow:hidden;
-}
-
-/* Neon frame square */
-.scan-frame{
-  position:absolute;
-  top:0; left:0; right:0; bottom:0;
-  border-radius:12px;
-  box-shadow:
-    0 0 0 3px #00ffbf inset,
-    0 0 30px #00ffbf;
-  pointer-events:none;
-}
-
-/* Status Box */
-#status{
-  margin-top:12px;
-  padding:12px;
-  border-radius:10px;
-  min-height:40px;
-  font-size:18px;
-}
-.ok{background:#003b2b;border:1px solid #00ffaa;}
-.bad{background:#3b0000;border:1px solid #ff6a6a;}
-
-/* Buttons */
-.btn{
-  padding:10px 25px;
-  border:none;
-  border-radius:8px;
-  margin:6px;
-  font-size:18px;
-  cursor:pointer;
-}
-.entry{background:#00ffbf;color:#000;}
-.exit{background:#ff4b4b;color:#fff;}
-.hidden{display:none;}
+body{margin:0;background:#000;color:#fff;font-family:Arial;text-align:center}
+h2{margin:12px;font-size:22px;color:#00ff99}
+#reader{width:90vw;max-width:350px;height:90vw;max-height:350px;margin:auto;border:3px solid #00ff99;border-radius:10px}
+#msg{margin-top:12px;font-size:20px;font-weight:bold}
 </style>
 </head>
 
 <body>
-
-<h2>Event QR Gate</h2>
-
-<div class="counter">Inside: <span id="count">0</span></div>
-
-<!-- Scanner -->
+<h2>🎉 KALARAVA 2025 ENTRY SCANNER</h2>
 <div id="reader"></div>
-<div class="scan-frame"></div>
-
-<div id="status">Scan QR…</div>
-
-<div id="actions" class="hidden">
-  <button id="entryBtn" class="btn entry">ENTRY</button>
-  <button id="exitBtn" class="btn exit">EXIT</button>
-</div>
+<div id="msg">Scan QR</div>
 
 <script>
-// -------------------- FIREBASE CONFIG --------------------
-const firebaseConfig = {
-  apiKey: "AIzaSyDjk4XNsJaYfoAwkcKrmuTmR7LywjHz7lk",
-  authDomain: "kalarava-scanner-87791.firebaseapp.com",
-  projectId: "kalarava-scanner-87791",
-  storageBucket: "kalarava-scanner-87791.firebasestorage.app",
-  messagingSenderId: "521057256617",
-  appId: "1:521057256617:web:2752fae1cbef9d9d5855b8"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-firebase.auth().signInAnonymously();
+const msg = document.getElementById("msg");
 
-// Live Count
-db.ref("active").on("value", s=>{
-  document.getElementById("count").textContent = s.numChildren();
-});
+function show(t,c){msg.style.background=c;msg.textContent=t;}
+function restart(){setTimeout(()=>{show("Scan QR","transparent");start();},1200);}
 
-// Helpers
-function clean(t){
-  let m=String(t).match(/[A-Za-z0-9]+/g);
-  return m?m.sort((a,b)=>b.length-a.length)[0]:t;
-}
-function status(m,c=""){let e=document.getElementById("status");e.textContent=m;e.className=c?("status "+c):"status";}
+async function onScan(qr){
+  show("Checking...","#222");
+  const result = await window.markScan(qr);
 
-let lastUSN=null;
+  if(result==="VALID") show("✅ VALID","#009933");
+  else show("🚫 DUPLICATE","#cc0000");
 
-// Scanner
-const qr = new Html5Qrcode("reader");
-
-Html5Qrcode.getCameras().then(cams=>{
-  // always pick the back camera
-  let back = cams.find(x=>x.label.toLowerCase().includes("back")) || cams[0];
-  qr.start(
-    back.id,
-    {fps:12, qrbox:{width:280,height:280}},
-    scanQR
-  );
-});
-
-async function scanQR(text){
-  let usn = clean(text);
-  lastUSN = usn;
-
-  let reg = (await db.ref("registry/"+usn).get()).val();
-  let used = (await db.ref("used/"+usn).get()).val();
-  let active = (await db.ref("active/"+usn).get()).val();
-
-  document.getElementById("actions").classList.add("hidden");
-
-  if(!reg) return status("Invalid Pass ❌","bad");
-  if(used) return status("Already Exited ❌","bad");
-
-  status("Valid ✅ Select Action","ok");
-  let btns = document.getElementById("actions");
-  btns.classList.remove("hidden");
-
-  entryBtn.style.display = active ? "none" : "inline-block";
-  exitBtn.style.display  = active ? "inline-block" : "none";
+  restart();
 }
 
-// ENTRY
-entryBtn.onclick=async()=>{
-  await db.ref("active/"+lastUSN).set({in:Date.now()});
-  await db.ref("public/"+lastUSN).set({in:Date.now()});
-  status("Entry ✅","ok");
-  document.getElementById("actions").classList.add("hidden");
-};
+function start(){
+  const qr=new Html5Qrcode("reader");
+  qr.start({facingMode:"environment"},{fps:12,qrbox:250},onScan);
+}
 
-// EXIT
-exitBtn.onclick=async()=>{
-  await db.ref("active/"+lastUSN).remove();
-  await db.ref("used/"+lastUSN).set({out:Date.now()});
-  await db.ref("public/"+lastUSN+"/out").set(Date.now());
-  status("Exit ✅","ok");
-  document.getElementById("actions").classList.add("hidden");
-};
+start();
 </script>
 </body>
 </html>
