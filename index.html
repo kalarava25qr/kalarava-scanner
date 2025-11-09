@@ -108,7 +108,10 @@ async function handleAction(){
   if(res==="ENTRY") show("✅ ENTRY RECORDED","#008f39");
   else if(res==="EXIT") show("✅ EXIT RECORDED","#0047ab");
   else show("❌ ENTRY NOT ALLOWED","#ff0000");
-  document.getElementById("entry-btn").classList.add("hidden");document.getElementById("exit-btn").classList.add("hidden");setTimeout(startScanner,1200);
+  document.getElementById("entry-btn").classList.add("hidden");
+document.getElementById("exit-btn").classList.add("hidden");
+cancelBtn.classList.add("hidden");
+setTimeout(startScanner,1200);
 }
 
 document.getElementById("entry-btn").onclick=handleAction;
