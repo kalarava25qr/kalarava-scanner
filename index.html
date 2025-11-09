@@ -33,12 +33,22 @@ window.checkEntry = async function (usn, checkOnly=false){
     return "VALID";
   }
 
-  if(snap.exists()){
-    await remove(r);
-    return "EXIT";
-  } else {
-    await set(r,{ scanned:true, time: Date.now() });
-    return "ENTRY";
+  // If record exists, check status
+if(snap.exists()){
+  const data = snap.val();
+
+  // If already exited, no re-entry allowed
+  if(data.status === "exit"){
+    return "BLOCKED"; // prevent re-entry
+  }
+
+  // If entry exists, this action becomes exit
+  await set(r,{ status:"exit", time: Date.now() });
+  return "EXIT";
+} else {
+  // No record = allow entry
+  await set(r,{ status:"entry", time: Date.now() });
+  return "ENTRY";
   }
 };
 
@@ -105,6 +115,12 @@ async function onScan(text){
     show("ℹ️ Already Inside — Tap EXIT","#b30000");
     exitBtn.classList.remove("hidden");pendingUSN=usn;
   }
+  else if(res==="BLOCKED"){
+    show("❌ ENTRY NOT ALLOWED — Already Exited","#ff0000");
+    setTimeout(startScanner,1200);
+  }
+  else
+  }
   else{
     show("❌ INVALID QR","#cc6600");setTimeout(startScanner,1200);
   }
@@ -116,6 +132,7 @@ async function handleAction(type){
   const res=await window.checkEntry(usn,false);
   if(res==="ENTRY") show("✅ ENTRY RECORDED","#008f39");
   else if(res==="EXIT") show("✅ EXIT RECORDED","#0047ab");
+  else if(res==="BLOCKED") show("❌ ENTRY NOT ALLOWED","#ff0000");
   else show("⚠️ ERROR","#cc6600");
   document.getElementById("entry-btn").classList.add("hidden");
   document.getElementById("exit-btn").classList.add("hidden");
