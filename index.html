@@ -144,8 +144,22 @@ document.getElementById("exit-btn").onclick=()=>handleAction("exit");
 
 function startScanner(){
   show("📷 Ready","transparent");
-  scanner = new Html5Qrcode("scanner-box");
-  scanner.start({ facingMode:"environment" },{fps:10,qrbox:{width:250,height:250}},onScan);
+  scanner = new Html5Qrcode("scanner-box", { verbose: true });
+
+  // Ensure container has correct layering
+  document.getElementById("scanner-box").style.position = "relative";
+
+  scanner.start(
+    { facingMode: "environment" },
+    {
+      fps: 10,
+      qrbox: 250,
+    },
+    onScan,
+    (err) => {
+      console.warn("Camera error:", err);
+    }
+  );
 }
 startScanner();
 </script>
