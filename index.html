@@ -22,29 +22,23 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-let mode = "entry"; // entry/exit mode
 
-window.setMode = function(m){ mode = m; updateModeDisplay(); }
-
-async function updateModeDisplay(){
-  document.getElementById("mode-label").textContent = mode.toUpperCase();
-}
-
-window.checkEntry = async function(usn){
+window.checkEntry = async function (usn, checkOnly=false){
   usn = usn.trim().toUpperCase();
   const r = ref(db,"attendance/"+usn);
   const snap = await get(r);
 
-  if(mode === "entry"){
+  if(checkOnly){
     if(snap.exists()) return "DUPLICATE";
-    await set(r,{ scanned:true, time: Date.now() });
     return "VALID";
   }
 
-  if(mode === "exit"){
-    if(!snap.exists()) return "NO-ENTRY";
+  if(snap.exists()){
     await remove(r);
     return "EXIT";
+  } else {
+    await set(r,{ scanned:true, time: Date.now() });
+    return "ENTRY";
   }
 };
 
@@ -54,7 +48,6 @@ window.updateCount = async function(){
   const count = snap.exists() ? Object.keys(snap.val()).length : 0;
   document.getElementById("count").textContent = count;
 };
-
 setInterval(window.updateCount,1000);
 </script>
 
@@ -62,111 +55,82 @@ setInterval(window.updateCount,1000);
 body{background:#000;color:#fff;text-align:center;font-family:Arial;margin:0;padding-top:10px}
 h2{color:#00bfff;margin-bottom:5px;text-shadow:0 0 8px #00bfff}
 #scanner-box{
-  width:80vw;
-  max-width:320px;
-  aspect-ratio:1/1;
-  height:auto;
-  margin:20px auto;
-  position:relative;
+  width:80vw;max-width:320px;aspect-ratio:1/1;height:auto;margin:20px auto;position:relative;
 }
-/* Neon tech frame */
+#scanner-box video{width:100%!important;height:100%!important;object-fit:cover;position:absolute;top:0;left:0;z-index:1;}
 #scanner-box:before{
-  content:"";
-  position:absolute;
-  inset:0;
-  border:4px solid #00bfff;
-  border-radius:10px;
-  pointer-events:none;
-  box-shadow:0 0 12px #00bfff,0 0 25px #00bfff inset;
-  z-index:5;
+  content:"";position:absolute;inset:0;border:4px solid #00bfff;border-radius:10px;pointer-events:none;box-shadow:0 0 12px #00bfff,0 0 25px #00bfff inset;z-index:5;
 }
 button{
-  background:#00bfff;color:#000;padding:10px 20px;border:none;border-radius:8px;margin:5px;font-weight:bold;
-  box-shadow:0 0 8px #00bfff;cursor:pointer
+  background:#00bfff;color:#000;padding:10px 20px;border:none;border-radius:8px;margin:5px;font-weight:bold;box-shadow:0 0 8px #00bfff;cursor:pointer
 }
-button.active{background:#000;color:#00bfff;border:2px solid #00bfff}
+button.hidden{display:none}
 #result{margin-top:8px;font-size:20px;font-weight:bold;padding:10px;border-radius:8px;min-height:50px}
 #count-box{margin-top:8px;font-size:18px;font-weight:bold;color:#00bfff;text-shadow:0 0 6px #00bfff}
 </style>
 </head>
-
 <body>
-<h2>KALARAVA 2025 ENTRY</h2>
-<div>
-  <button id="entry-btn" onclick="setMode('entry')">Entry</button>
-  <button id="exit-btn" onclick="setMode('exit')">Exit</button>
-</div>
-<div id="mode-label" style="margin-top:5px;color:#00bfff;font-size:18px;font-weight:bold"></div>
-
+<h2>KALARAVA 2025</h2>
 <div id="scanner-box"></div>
 <div id="result">Scan a QR</div>
+
+<div>
+  <button id="entry-btn" class="hidden">ENTRY</button>
+  <button id="exit-btn" class="hidden">EXIT</button>
+</div>
+
 <div id="count-box">Total inside: <span id="count">0</span></div>
 
 <script>
 let scanner;
+let pendingUSN=null;
+
 function show(msg,color){const box=document.getElementById("result");box.style.background=color;box.textContent=msg;}
+
 async function onScan(text){
   await scanner.stop();
   show("Checking...","#222");
+  const usn=text.trim().toUpperCase();
+  const res=await window.checkEntry(usn,true);
 
-  const usn = text.trim().toUpperCase();
-  const res = await window.checkEntry(usn, true); // true = check only
+  const entryBtn=document.getElementById("entry-btn");
+  const exitBtn=document.getElementById("exit-btn");
+  entryBtn.classList.add("hidden");exitBtn.classList.add("hidden");
 
-  // Enable buttons but hide depending on result
-  const entryBtn = document.getElementById("entry-btn");
-  const exitBtn = document.getElementById("exit-btn");
-
-  entryBtn.disabled = true;
-  exitBtn.disabled = true;
-  entryBtn.style.display = "none";
-  exitBtn.style.display = "none";
-
-  if(res === "VALID"){
-    show("✅ VALID QR — Select Entry","#0047ab");
-    entryBtn.style.display = "inline-block";
-    entryBtn.disabled = false;
-    window.pendingUSN = usn;
+  if(res==="VALID"){
+    show("✅ VALID QR — Tap ENTRY","#0047ab");
+    entryBtn.classList.remove("hidden");pendingUSN=usn;
   }
-  else if(res === "DUPLICATE"){
-    show("ℹ️ Already Inside — Select Exit","#b30000");
-    exitBtn.style.display = "inline-block";
-    exitBtn.disabled = false;
-    window.pendingUSN = usn;
+  else if(res==="DUPLICATE"){
+    show("ℹ️ Already Inside — Tap EXIT","#b30000");
+    exitBtn.classList.remove("hidden");pendingUSN=usn;
   }
   else{
-    show("❌ INVALID QR","#cc6600");
-    setTimeout(startScanner,1200);
+    show("❌ INVALID QR","#cc6600");setTimeout(startScanner,1200);
   }
 }
 
-window.setMode = async function(m){
-  mode = m;
-  updateModeDisplay();
+async function handleAction(type){
+  if(!pendingUSN) return;
+  const usn=pendingUSN;pendingUSN=null;
+  const res=await window.checkEntry(usn,false);
+  if(res==="ENTRY") show("✅ ENTRY RECORDED","#008f39");
+  else if(res==="EXIT") show("✅ EXIT RECORDED","#0047ab");
+  else show("⚠️ ERROR","#cc6600");
+  document.getElementById("entry-btn").classList.add("hidden");
+  document.getElementById("exit-btn").classList.add("hidden");
+  setTimeout(startScanner,1200);
+}
 
-  if(window.pendingUSN){
-    const usn = window.pendingUSN;
-    window.pendingUSN = null;
+document.getElementById("entry-btn").onclick=()=>handleAction("entry");
+document.getElementById("exit-btn").onclick=()=>handleAction("exit");
 
-    const res = await window.checkEntry(usn, false);
-
-    if(res === "VALID") show("✅ ENTRY RECORDED","#008f39");
-    else if(res === "EXIT") show("✅ EXIT RECORDED","#0047ab");
-    else if(res === "NO-ENTRY") show("❌ NOT FOUND","#cc6600");
-    else show("⚠️ ERROR","#cc6600");
-
-    document.getElementById("entry-btn").disabled = true;
-    document.getElementById("exit-btn").disabled = true;
-    document.getElementById("entry-btn").style.display = "none";
-    document.getElementById("exit-btn").style.display = "none";
-
-    setTimeout(startScanner,1200);
-  }
-},1000);
-  }
-},1000);} 
-function startScanner(){show("📷 Ready","transparent");scanner = new Html5Qrcode("scanner-box");scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:250,height:250},disableFlip:true},onScan);} 
-startScanner();window.setMode("entry");
+function startScanner(){
+  show("📷 Ready","transparent");
+  scanner = new Html5Qrcode("scanner-box");
+  scanner.start({ facingMode:{ exact:"environment" } },{fps:10,qrbox:{width:250,height:250}},onScan);
+}
+startScanner();
 </script>
-
 </body>
 </html>
