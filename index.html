@@ -101,35 +101,61 @@ let scanner;
 function show(msg,color){const box=document.getElementById("result");box.style.background=color;box.textContent=msg;}
 async function onScan(text){
   await scanner.stop();
-  show("Choose Entry or Exit","#222");
+  show("Checking...","#222");
 
-  // Enable buttons to choose after scan
-  document.getElementById("entry-btn").disabled = false;
-  document.getElementById("exit-btn").disabled = false;
+  const usn = text.trim().toUpperCase();
+  const res = await window.checkEntry(usn, true); // true = check only
 
-  window.pendingUSN = text.trim().toUpperCase();
+  // Enable buttons but hide depending on result
+  const entryBtn = document.getElementById("entry-btn");
+  const exitBtn = document.getElementById("exit-btn");
+
+  entryBtn.disabled = true;
+  exitBtn.disabled = true;
+  entryBtn.style.display = "none";
+  exitBtn.style.display = "none";
+
+  if(res === "VALID"){
+    show("✅ VALID QR — Select Entry","#0047ab");
+    entryBtn.style.display = "inline-block";
+    entryBtn.disabled = false;
+    window.pendingUSN = usn;
+  }
+  else if(res === "DUPLICATE"){
+    show("ℹ️ Already Inside — Select Exit","#b30000");
+    exitBtn.style.display = "inline-block";
+    exitBtn.disabled = false;
+    window.pendingUSN = usn;
+  }
+  else{
+    show("❌ INVALID QR","#cc6600");
+    setTimeout(startScanner,1200);
+  }
 }
 
-// Override setMode to process after selecting
 window.setMode = async function(m){
   mode = m;
   updateModeDisplay();
 
   if(window.pendingUSN){
-    const res = await window.checkEntry(window.pendingUSN);
+    const usn = window.pendingUSN;
     window.pendingUSN = null;
 
-    if(res==="VALID") show("✅ ENTRY ALLOWED","#008f39");
-    else if(res==="DUPLICATE") show("🚫 ALREADY INSIDE","#b30000");
-    else if(res==="EXIT") show("✅ EXIT RECORDED","#0047ab");
-    else if(res==="NO-ENTRY") show("❌ NOT FOUND","#cc6600");
-    else show("❌ INVALID","#cc6600");
+    const res = await window.checkEntry(usn, false);
 
-    // disable after selecting
+    if(res === "VALID") show("✅ ENTRY RECORDED","#008f39");
+    else if(res === "EXIT") show("✅ EXIT RECORDED","#0047ab");
+    else if(res === "NO-ENTRY") show("❌ NOT FOUND","#cc6600");
+    else show("⚠️ ERROR","#cc6600");
+
     document.getElementById("entry-btn").disabled = true;
     document.getElementById("exit-btn").disabled = true;
+    document.getElementById("entry-btn").style.display = "none";
+    document.getElementById("exit-btn").style.display = "none";
 
-    setTimeout(startScanner,1000);
+    setTimeout(startScanner,1200);
+  }
+},1000);
   }
 },1000);} 
 function startScanner(){show("📷 Ready","transparent");scanner = new Html5Qrcode("scanner-box");scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:250,height:250},disableFlip:true},onScan);} 
