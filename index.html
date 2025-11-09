@@ -127,8 +127,18 @@ cancelBtn.onclick = () => {
 function startScanner(){
   show("📷 Ready","transparent");
   scanner = new Html5Qrcode("scanner-box");
-  scanner.start({}, { fps:10, qrbox:250 }, onScan);
+  scanner.start(
+  { facingMode: "environment" },
+  { fps: 10, qrbox: 250 },
+  onScan,
+  (err) => console.error("Camera error:", err)
+);
+
 }
+navigator.mediaDevices.getUserMedia({ video: true })
+  .then(() => console.log("Camera permission granted"))
+  .catch(() => alert("Please enable camera permission"));
+
 startScanner();
 </script>
 </body></html>
