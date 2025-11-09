@@ -150,8 +150,15 @@ function startScanner(){
   document.getElementById("scanner-box").style.position = "relative";
 
   // Try back camera first, fallback to default
+  // Start scanner with full mobile compatibility
   scanner.start(
-    { facingMode: { ideal: "environment" } },
+    {
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    },
     {
       fps: 10,
       qrbox: { width: 250, height: 250 },
