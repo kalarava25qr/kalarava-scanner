@@ -129,7 +129,7 @@ document.getElementById("entryBtn").onclick = async()=>{
     ts:Date.now(),
     by:firebase.auth().currentUser.uid
   });
-  await db.ref("log").push({id:lastID,action:"ENTRY",ts:Date.now()});
+  await db.ref("public/" + currentUSN).set({ in: Date.now() });
   setMsg("Entry Recorded", "ok");
   document.getElementById("actions").classList.add("hidden");
 };
@@ -139,7 +139,7 @@ document.getElementById("exitBtn").onclick = async()=>{
   if(!lastID) return;
   await db.ref("active/"+lastID).remove();
   await db.ref("used/"+lastID).set(true);
-  await db.ref("log").push({id:lastID,action:"EXIT",ts:Date.now()});
+  await db.ref("public/" + currentUSN + "/out").set(Date.now());
   setMsg("Exit Recorded", "ok");
   document.getElementById("actions").classList.add("hidden");
 };
