@@ -71,12 +71,17 @@ button.hidden{display:none}
 <h2>KALARAVA 2025</h2>
 <div id="scanner-box"></div>
 <div id="result">Scan a QR</div>
-<div><button id="entry-btn" class="hidden">ENTRY</button><button id="exit-btn" class="hidden">EXIT</button></div>
+<div>
+  <button id="entry-btn" class="hidden" style="font-size:26px;padding:20px 35px;">ENTRY</button>
+  <button id="exit-btn" class="hidden" style="font-size:26px;padding:20px 35px;">EXIT</button>
+  <button id="cancel-btn" class="hidden" style="font-size:20px;padding:14px 28px;background:#444;color:#fff;border:2px solid #888;">CANCEL</button>
+</div>
 <div id="count-box">Total inside: <span id="count">0</span></div>
 
 <script>
 let scanner;
 let pendingUSN=null;
+const cancelBtn = document.getElementById('cancel-btn');
 
 function show(msg,color){const box=document.getElementById("result");box.style.background=color;box.textContent=msg;}
 
@@ -88,10 +93,10 @@ async function onScan(text){
 
   const entryBtn=document.getElementById("entry-btn");
   const exitBtn=document.getElementById("exit-btn");
-  entryBtn.classList.add("hidden");exitBtn.classList.add("hidden");
+  entryBtn.classList.add("hidden");exitBtn.classList.add("hidden");cancelBtn.classList.add("hidden");
 
-  if(res==="VALID"){show("✅ VALID QR — Tap ENTRY","#0047ab");entryBtn.classList.remove("hidden");pendingUSN=usn;}
-  else if(res==="DUPLICATE"){show("ℹ️ Already Inside — Tap EXIT","#b30000");exitBtn.classList.remove("hidden");pendingUSN=usn;}
+  if(res==="VALID"){show("✅ VALID QR — Tap ENTRY","#0047ab");entryBtn.classList.remove("hidden");cancelBtn.classList.remove("hidden");pendingUSN=usn;}
+  else if(res==="DUPLICATE"){show("ℹ️ Already Inside — Tap EXIT","#b30000");exitBtn.classList.remove("hidden");cancelBtn.classList.remove("hidden");pendingUSN=usn;}
   else if(res==="BLOCKED"){show("❌ ENTRY NOT ALLOWED — Already Exited","#ff0000");setTimeout(startScanner,1200);}
   else{show("❌ INVALID QR","#cc6600");setTimeout(startScanner,1200);}
 }
@@ -109,21 +114,21 @@ async function handleAction(){
 document.getElementById("entry-btn").onclick=handleAction;
 document.getElementById("exit-btn").onclick=handleAction;
 
+// Cancel button logic
+cancelBtn.onclick = () => {
+  pendingUSN = null;
+  document.getElementById("entry-btn").classList.add("hidden");
+  document.getElementById("exit-btn").classList.add("hidden");
+  cancelBtn.classList.add("hidden");
+  show("📷 Ready","transparent");
+  startScanner();
+};
+
 function startScanner(){
   show("📷 Ready","transparent");
   scanner = new Html5Qrcode("scanner-box");
-  scanner.start(
-  { facingMode: "environment" },
-  { fps: 10, qrbox: 250 },
-  onScan,
-  (err) => console.error("Camera error:", err)
-);
-
+  scanner.start({}, { fps:10, qrbox:250 }, onScan);
 }
-navigator.mediaDevices.getUserMedia({ video: true })
-  .then(() => console.log("Camera permission granted"))
-  .catch(() => alert("Please enable camera permission"));
-
 startScanner();
 </script>
 </body></html>
