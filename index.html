@@ -99,7 +99,39 @@ button.active{background:#000;color:#00bfff;border:2px solid #00bfff}
 <script>
 let scanner;
 function show(msg,color){const box=document.getElementById("result");box.style.background=color;box.textContent=msg;}
-async function onScan(text){await scanner.stop();show("Checking...","#222");const res = await window.checkEntry(text);if(res==="VALID") show("✅ ENTRY ALLOWED","#008f39");else if(res==="DUPLICATE") show("🚫 ALREADY INSIDE","#b30000");else if(res==="EXIT") show("✅ EXIT RECORDED","#0047ab");else if(res==="NO-ENTRY") show("❌ NOT FOUND","#cc6600");else show("❌ INVALID","#cc6600");setTimeout(startScanner,1000);} 
+async function onScan(text){
+  await scanner.stop();
+  show("Choose Entry or Exit","#222");
+
+  // Enable buttons to choose after scan
+  document.getElementById("entry-btn").disabled = false;
+  document.getElementById("exit-btn").disabled = false;
+
+  window.pendingUSN = text.trim().toUpperCase();
+}
+
+// Override setMode to process after selecting
+window.setMode = async function(m){
+  mode = m;
+  updateModeDisplay();
+
+  if(window.pendingUSN){
+    const res = await window.checkEntry(window.pendingUSN);
+    window.pendingUSN = null;
+
+    if(res==="VALID") show("✅ ENTRY ALLOWED","#008f39");
+    else if(res==="DUPLICATE") show("🚫 ALREADY INSIDE","#b30000");
+    else if(res==="EXIT") show("✅ EXIT RECORDED","#0047ab");
+    else if(res==="NO-ENTRY") show("❌ NOT FOUND","#cc6600");
+    else show("❌ INVALID","#cc6600");
+
+    // disable after selecting
+    document.getElementById("entry-btn").disabled = true;
+    document.getElementById("exit-btn").disabled = true;
+
+    setTimeout(startScanner,1000);
+  }
+},1000);} 
 function startScanner(){show("📷 Ready","transparent");scanner = new Html5Qrcode("scanner-box");scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:250,height:250},disableFlip:true},onScan);} 
 startScanner();window.setMode("entry");
 </script>
