@@ -8,7 +8,7 @@
 <!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import { getDatabase, ref, get, set, remove } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
+import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDQ7zrV4Ao9TdJwD0BBOm1Cn7oSL1gEM1A",
@@ -29,33 +29,27 @@ window.checkEntry = async function (usn, checkOnly=false){
   const snap = await get(r);
 
   if(checkOnly){
-    if(snap.exists()) return "DUPLICATE";
-    return "VALID";
+    if(!snap.exists()) return "VALID";
+    const data = snap.val();
+    if(data.status === "exit") return "BLOCKED";
+    return "DUPLICATE";
   }
 
-  // If record exists, check status
-if(snap.exists()){
-  const data = snap.val();
-
-  // If already exited, no re-entry allowed
-  if(data.status === "exit"){
-    return "BLOCKED"; // prevent re-entry
-  }
-
-  // If entry exists, this action becomes exit
-  await set(r,{ status:"exit", time: Date.now() });
-  return "EXIT";
-} else {
-  // No record = allow entry
-  await set(r,{ status:"entry", time: Date.now() });
-  return "ENTRY";
+  if(snap.exists()){
+    const data = snap.val();
+    if(data.status === "exit") return "BLOCKED";
+    await set(r,{ status:"exit", time: Date.now() });
+    return "EXIT";
+  } else {
+    await set(r,{ status:"entry", time: Date.now() });
+    return "ENTRY";
   }
 };
 
 window.updateCount = async function(){
   const r = ref(db, "attendance");
   const snap = await get(r);
-  const count = snap.exists() ? Object.keys(snap.val()).length : 0;
+  const count = snap.exists() ? Object.values(snap.val()).filter(x=>x.status==="entry").length : 0;
   document.getElementById("count").textContent = count;
 };
 setInterval(window.updateCount,1000);
@@ -67,9 +61,20 @@ h2{color:#00bfff;margin-bottom:5px;text-shadow:0 0 8px #00bfff}
 #scanner-box{
   width:80vw;max-width:320px;aspect-ratio:1/1;height:auto;margin:20px auto;position:relative;
 }
-#scanner-box video{width:100%!important;height:100%!important;object-fit:cover;position:absolute;top:0;left:0;z-index:1;}
+#scanner-box video{
+  width:100%!important;
+  height:100%!important;
+  object-fit:cover;
+  position:absolute;
+  top:0;
+  left:0;
+  z-index:1;
+  playsinline:true;
+  -webkit-playsinline:true;
+}
 #scanner-box:before{
-  content:"";position:absolute;inset:0;border:4px solid #00bfff;border-radius:10px;pointer-events:none;box-shadow:0 0 12px #00bfff,0 0 25px #00bfff inset;z-index:5;
+  content:"";position:absolute;inset:0;border:4px solid #00bfff;border-radius:10px;pointer-events:none;
+  box-shadow:0 0 12px #00bfff,0 0 25px #00bfff inset;z-index:5;
 }
 button{
   background:#00bfff;color:#000;padding:10px 20px;border:none;border-radius:8px;margin:5px;font-weight:bold;box-shadow:0 0 8px #00bfff;cursor:pointer
@@ -79,6 +84,7 @@ button.hidden{display:none}
 #count-box{margin-top:8px;font-size:18px;font-weight:bold;color:#00bfff;text-shadow:0 0 6px #00bfff}
 </style>
 </head>
+
 <body>
 <h2>KALARAVA 2025</h2>
 <div id="scanner-box"></div>
@@ -93,50 +99,52 @@ button.hidden{display:none}
 
 <script>
 let scanner;
-let pendingUSN=null;
+let pendingUSN = null;
 
 function show(msg,color){const box=document.getElementById("result");box.style.background=color;box.textContent=msg;}
 
 async function onScan(text){
   await scanner.stop();
   show("Checking...","#222");
-  const usn=text.trim().toUpperCase();
-  const res=await window.checkEntry(usn,true);
+  const usn = text.trim().toUpperCase();
+  const res = await window.checkEntry(usn,true);
 
   const entryBtn=document.getElementById("entry-btn");
   const exitBtn=document.getElementById("exit-btn");
-  entryBtn.classList.add("hidden");exitBtn.classList.add("hidden");
+  entryBtn.classList.add("hidden"); exitBtn.classList.add("hidden");
 
   if(res==="VALID"){
-    show("✅ VALID QR — Tap ENTRY","#0047ab");
-    entryBtn.classList.remove("hidden");pendingUSN=usn;
+    show("✅ Valid QR — Tap ENTRY","#0047ab");
+    entryBtn.classList.remove("hidden");
+    pendingUSN = usn;
   }
   else if(res==="DUPLICATE"){
     show("ℹ️ Already Inside — Tap EXIT","#b30000");
-    exitBtn.classList.remove("hidden");pendingUSN=usn;
+    exitBtn.classList.remove("hidden");
+    pendingUSN = usn;
   }
   else if(res==="BLOCKED"){
     show("❌ ENTRY NOT ALLOWED — Already Exited","#ff0000");
-    setTimeout(startScanner,1200);
-  }
-  else
+    setTimeout(startScanner,1500);
   }
   else{
-    show("❌ INVALID QR","#cc6600");setTimeout(startScanner,1200);
+    show("❌ INVALID QR","#cc6600");
+    setTimeout(startScanner,1500);
   }
 }
 
 async function handleAction(type){
   if(!pendingUSN) return;
-  const usn=pendingUSN;pendingUSN=null;
-  const res=await window.checkEntry(usn,false);
-  if(res==="ENTRY") show("✅ ENTRY RECORDED","#008f39");
-  else if(res==="EXIT") show("✅ EXIT RECORDED","#0047ab");
-  else if(res==="BLOCKED") show("❌ ENTRY NOT ALLOWED","#ff0000");
-  else show("⚠️ ERROR","#cc6600");
+  const res = await window.checkEntry(pendingUSN,false);
+  pendingUSN=null;
+
+  if(res==="ENTRY") show("✅ Entry Recorded","#008f39");
+  else if(res==="EXIT") show("✅ Exit Recorded","#0047ab");
+  else show("❌ ENTRY NOT ALLOWED","#ff0000");
+
   document.getElementById("entry-btn").classList.add("hidden");
   document.getElementById("exit-btn").classList.add("hidden");
-  setTimeout(startScanner,1200);
+  setTimeout(startScanner,1500);
 }
 
 document.getElementById("entry-btn").onclick=()=>handleAction("entry");
@@ -144,29 +152,11 @@ document.getElementById("exit-btn").onclick=()=>handleAction("exit");
 
 function startScanner(){
   show("📷 Ready","transparent");
-  scanner = new Html5Qrcode("scanner-box", { verbose: true });
-
-  // Ensure container has correct layering
-  document.getElementById("scanner-box").style.position = "relative";
-
-  // Try back camera first, fallback to default
-  // Start scanner with full mobile compatibility
+  scanner = new Html5Qrcode("scanner-box");
   scanner.start(
-    {
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      }
-    },
-    {
-      fps: 10,
-      qrbox: { width: 250, height: 250 },
-    },
-    onScan,
-    (err) => {
-      console.warn("Camera error:", err);
-    }
+    { video: { facingMode: { ideal:"environment" }, width:{ideal:1280}, height:{ideal:720} } },
+    { fps:10, qrbox:{width:250,height:250} },
+    onScan
   );
 }
 startScanner();
