@@ -145,7 +145,7 @@ document.getElementById("exit-btn").onclick=()=>handleAction("exit");
 function startScanner(){
   show("📷 Ready","transparent");
   scanner = new Html5Qrcode("scanner-box");
-  scanner.start({ facingMode:{ exact:"environment" } },{fps:10,qrbox:{width:250,height:250}},onScan);
+  scanner.start({ facingMode:"environment" },{fps:10,qrbox:{width:250,height:250}},onScan);
 }
 startScanner();
 </script>
