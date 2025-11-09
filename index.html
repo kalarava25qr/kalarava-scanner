@@ -149,11 +149,12 @@ function startScanner(){
   // Ensure container has correct layering
   document.getElementById("scanner-box").style.position = "relative";
 
+  // Try back camera first, fallback to default
   scanner.start(
-    { facingMode: "environment" },
+    { facingMode: { ideal: "environment" } },
     {
       fps: 10,
-      qrbox: 250,
+      qrbox: { width: 250, height: 250 },
     },
     onScan,
     (err) => {
