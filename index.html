@@ -8,7 +8,7 @@
 <!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import { getDatabase, ref, get, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
+import { getDatabase, ref, get, set, push } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDQ7zrV4Ao9TdJwD0BBOm1Cn7oSL1gEM1A",
@@ -23,25 +23,33 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// --- Main logging function ---
+// ---- Log Function (Firebase + Google Sheets) ----
 window.logEntry = async function(usn) {
   usn = usn.trim().toUpperCase();
-  if (!usn) return "INVALID";
+  if (!usn) return { status: "INVALID" };
 
-  const userRef = ref(db, "attendance/" + usn + "/logs");
-  const newLogRef = push(userRef);
+  const logsRef = ref(db, "attendance/" + usn + "/logs");
+  const newLogRef = push(logsRef);
   const timestamp = new Date().toLocaleString();
 
+  // Save log in Firebase
   await set(newLogRef, { time: timestamp });
 
-  // Get updated count
-  const snapshot = await get(userRef);
+  // Fetch current log count
+  const snapshot = await get(logsRef);
   const count = snapshot.exists() ? Object.keys(snapshot.val()).length : 1;
 
-  // Store count in a separate node for easy access
+  // Update total count node
   await set(ref(db, "attendance/" + usn + "/count"), count);
 
-  return { usn, count, timestamp };
+  // --- Optional: Send data to Google Sheets ---
+  fetch("https://script.google.com/macros/s/YOUR_SHEET_SCRIPT_ID/exec", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ usn, timestamp, count })
+  }).catch(err => console.log("Sheets error:", err));
+
+  return { status: "OK", usn, count };
 };
 </script>
 
@@ -56,19 +64,13 @@ h2 { color:#00bfff; margin-bottom:5px; text-shadow:0 0 8px #00bfff; }
   z-index:1; playsinline:true; -webkit-playsinline:true;
 }
 #scanner-box:before {
-  content:""; position:absolute; inset:0; border:4px solid #00bfff; border-radius:10px; pointer-events:none;
-  box-shadow:0 0 12px #00bfff,0 0 25px #00bfff inset; z-index:5;
+  content:""; position:absolute; inset:0; border:4px solid #00bfff; border-radius:10px;
+  pointer-events:none; box-shadow:0 0 12px #00bfff,0 0 25px #00bfff inset; z-index:5;
 }
 #result {
-  margin-top:8px; font-size:20px; font-weight:bold; padding:10px; border-radius:8px; min-height:50px;
+  margin-top:12px; font-size:20px; font-weight:bold; padding:10px; border-radius:8px;
+  min-height:50px; color:#00bfff;
 }
-#history {
-  margin-top:20px; text-align:left; max-width:350px; margin-left:auto; margin-right:auto;
-  background:#111; border-radius:10px; padding:10px; font-size:14px; overflow-y:auto; max-height:250px;
-}
-#history h3 { color:#00bfff; text-align:center; margin:5px 0; }
-#history ul { list-style:none; padding:0; margin:0; }
-#history li { padding:5px; border-bottom:1px solid #333; }
 </style>
 </head>
 
@@ -76,47 +78,39 @@ h2 { color:#00bfff; margin-bottom:5px; text-shadow:0 0 8px #00bfff; }
 <h2>KALARAVA 2025 LOGGER</h2>
 <div id="scanner-box"></div>
 <div id="result">Scan a QR</div>
-<div id="history"><h3>Logs</h3><ul id="log-list"></ul></div>
 
 <script>
 let scanner;
 
-function show(msg,color){
-  const box=document.getElementById("result");
-  box.style.background=color;
-  box.textContent=msg;
+function show(msg, color) {
+  const box = document.getElementById("result");
+  box.style.color = color;
+  box.textContent = msg;
 }
 
-async function onScan(text){
+async function onScan(text) {
   await scanner.stop();
-  show("Processing...","#222");
+  show("Processing...", "#aaa");
 
   const res = await window.logEntry(text);
 
-  if(res === "INVALID"){
-    show("❌ INVALID QR","#cc6600");
+  if (res.status === "INVALID") {
+    show("❌ INVALID QR", "#ff4444");
+  } else if (res.status === "OK") {
+    show(`✅ ${res.usn} — Total Entries: ${res.count}`, "#00bfff");
   } else {
-    show(`✅ ${res.usn} — Entry #${res.count}`,"#0047ab");
-    addToList(res.usn, res.timestamp, res.count);
+    show("⚠️ ERROR", "#ff8800");
   }
 
-  setTimeout(startScanner,1500);
+  setTimeout(startScanner, 1200);
 }
 
-// Display logs on screen
-function addToList(usn, time, count){
-  const list = document.getElementById("log-list");
-  const li = document.createElement("li");
-  li.textContent = `${usn} | Entry ${count} | ${time}`;
-  list.prepend(li);
-}
-
-// Start scanner
-function startScanner(){
-  show("📷 Ready to scan","transparent");
+function startScanner() {
+  show("📷 Ready to scan", "#00bfff");
   scanner = new Html5Qrcode("scanner-box");
   scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScan);
 }
+
 startScanner();
 </script>
 </body>
