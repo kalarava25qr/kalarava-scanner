@@ -2,13 +2,13 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Kalarava QR Scanner</title>
+<title>Kalarava QR Logger</title>
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
+import { getDatabase, ref, get, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDQ7zrV4Ao9TdJwD0BBOm1Cn7oSL1gEM1A",
@@ -23,125 +23,101 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-window.checkEntry = async function (usn, checkOnly=false){
+// --- Main logging function ---
+window.logEntry = async function(usn) {
   usn = usn.trim().toUpperCase();
-  const r = ref(db,"attendance/"+usn);
-  const snap = await get(r);
+  if (!usn) return "INVALID";
 
-  if(checkOnly){
-    if(!snap.exists()) return "VALID";
-    const data = snap.val();
-    if(data.status === "exit") return "BLOCKED";
-    return "DUPLICATE";
-  }
+  const userRef = ref(db, "attendance/" + usn + "/logs");
+  const newLogRef = push(userRef);
+  const timestamp = new Date().toLocaleString();
 
-  if(snap.exists()){
-    const data = snap.val();
-    if(data.status === "exit") return "BLOCKED";
-    await set(r,{ status:"exit", time: Date.now() });
-    return "EXIT";
-  } else {
-    await set(r,{ status:"entry", time: Date.now() });
-    return "ENTRY";
-  }
+  await set(newLogRef, { time: timestamp });
+
+  // Get updated count
+  const snapshot = await get(userRef);
+  const count = snapshot.exists() ? Object.keys(snapshot.val()).length : 1;
+
+  // Store count in a separate node for easy access
+  await set(ref(db, "attendance/" + usn + "/count"), count);
+
+  return { usn, count, timestamp };
 };
-
-window.updateCount = async function(){
-  const r = ref(db, "attendance");
-  const snap = await get(r);
-  const count = snap.exists() ? Object.values(snap.val()).filter(x=>x.status==="entry").length : 0;
-  document.getElementById("count").textContent = count;
-};
-setInterval(window.updateCount,1000);
 </script>
 
 <style>
-body{background:#000;color:#fff;text-align:center;font-family:Arial;margin:0;padding-top:10px}
-h2{color:#00bfff;margin-bottom:5px;text-shadow:0 0 8px #00bfff}
-#scanner-box{width:80vw;max-width:320px;aspect-ratio:1/1;height:auto;margin:20px auto;position:relative;}
-#scanner-box video{width:100%!important;height:100%!important;object-fit:cover;position:absolute;top:0;left:0;z-index:1;playsinline:true;-webkit-playsinline:true;}
-#scanner-box:before{content:"";position:absolute;inset:0;border:4px solid #00bfff;border-radius:10px;pointer-events:none;box-shadow:0 0 12px #00bfff,0 0 25px #00bfff inset;z-index:5;}
-button{background:#00bfff;color:#000;padding:10px 20px;border:none;border-radius:8px;margin:5px;font-weight:bold;box-shadow:0 0 8px #00bfff;cursor:pointer}
-button.hidden{display:none}
-#result{margin-top:8px;font-size:20px;font-weight:bold;padding:10px;border-radius:8px;min-height:50px}
-#count-box{margin-top:8px;font-size:18px;font-weight:bold;color:#00bfff;text-shadow:0 0 6px #00bfff}
+body { background:#000; color:#fff; text-align:center; font-family:Arial; margin:0; padding-top:10px; }
+h2 { color:#00bfff; margin-bottom:5px; text-shadow:0 0 8px #00bfff; }
+#scanner-box {
+  width:80vw; max-width:320px; aspect-ratio:1/1; height:auto; margin:20px auto; position:relative;
+}
+#scanner-box video {
+  width:100%!important; height:100%!important; object-fit:cover; position:absolute; top:0; left:0;
+  z-index:1; playsinline:true; -webkit-playsinline:true;
+}
+#scanner-box:before {
+  content:""; position:absolute; inset:0; border:4px solid #00bfff; border-radius:10px; pointer-events:none;
+  box-shadow:0 0 12px #00bfff,0 0 25px #00bfff inset; z-index:5;
+}
+#result {
+  margin-top:8px; font-size:20px; font-weight:bold; padding:10px; border-radius:8px; min-height:50px;
+}
+#history {
+  margin-top:20px; text-align:left; max-width:350px; margin-left:auto; margin-right:auto;
+  background:#111; border-radius:10px; padding:10px; font-size:14px; overflow-y:auto; max-height:250px;
+}
+#history h3 { color:#00bfff; text-align:center; margin:5px 0; }
+#history ul { list-style:none; padding:0; margin:0; }
+#history li { padding:5px; border-bottom:1px solid #333; }
 </style>
 </head>
+
 <body>
-<h2>KALARAVA 2025</h2>
+<h2>KALARAVA 2025 LOGGER</h2>
 <div id="scanner-box"></div>
 <div id="result">Scan a QR</div>
-<div>
-  <button id="entry-btn" class="hidden" style="font-size:26px;padding:20px 35px;">ENTRY</button>
-  <button id="exit-btn" class="hidden" style="font-size:26px;padding:20px 35px;">EXIT</button>
-  <button id="cancel-btn" class="hidden" style="font-size:20px;padding:14px 28px;background:#444;color:#fff;border:2px solid #888;">CANCEL</button>
-</div>
-<div id="count-box">Total inside: <span id="count">0</span></div>
+<div id="history"><h3>Logs</h3><ul id="log-list"></ul></div>
 
 <script>
 let scanner;
-let pendingUSN=null;
-const cancelBtn = document.getElementById('cancel-btn');
 
-function show(msg,color){const box=document.getElementById("result");box.style.background=color;box.textContent=msg;}
+function show(msg,color){
+  const box=document.getElementById("result");
+  box.style.background=color;
+  box.textContent=msg;
+}
 
 async function onScan(text){
   await scanner.stop();
-  show("Checking...","#222");
-  const usn=text.trim().toUpperCase();
-  const res=await window.checkEntry(usn,true);
+  show("Processing...","#222");
 
-  const entryBtn=document.getElementById("entry-btn");
-  const exitBtn=document.getElementById("exit-btn");
-  entryBtn.classList.add("hidden");exitBtn.classList.add("hidden");cancelBtn.classList.add("hidden");
+  const res = await window.logEntry(text);
 
-  if(res==="VALID"){show("✅ VALID QR — Tap ENTRY","#0047ab");entryBtn.classList.remove("hidden");cancelBtn.classList.remove("hidden");pendingUSN=usn;}
-  else if(res==="DUPLICATE"){show("ℹ️ Already Inside — Tap EXIT","#b30000");exitBtn.classList.remove("hidden");cancelBtn.classList.remove("hidden");pendingUSN=usn;}
-  else if(res==="BLOCKED"){show("❌ ENTRY NOT ALLOWED — Already Exited","#ff0000");setTimeout(startScanner,1200);}
-  else{show("❌ INVALID QR","#cc6600");setTimeout(startScanner,1200);}
+  if(res === "INVALID"){
+    show("❌ INVALID QR","#cc6600");
+  } else {
+    show(`✅ ${res.usn} — Entry #${res.count}`,"#0047ab");
+    addToList(res.usn, res.timestamp, res.count);
+  }
+
+  setTimeout(startScanner,1500);
 }
 
-async function handleAction(){
-  if(!pendingUSN) return;
-  const usn=pendingUSN;pendingUSN=null;
-  const res=await window.checkEntry(usn,false);
-  if(res==="ENTRY") show("✅ ENTRY RECORDED","#008f39");
-  else if(res==="EXIT") show("✅ EXIT RECORDED","#0047ab");
-  else show("❌ ENTRY NOT ALLOWED","#ff0000");
-  document.getElementById("entry-btn").classList.add("hidden");
-document.getElementById("exit-btn").classList.add("hidden");
-cancelBtn.classList.add("hidden");
-setTimeout(startScanner,1200);
+// Display logs on screen
+function addToList(usn, time, count){
+  const list = document.getElementById("log-list");
+  const li = document.createElement("li");
+  li.textContent = `${usn} | Entry ${count} | ${time}`;
+  list.prepend(li);
 }
 
-document.getElementById("entry-btn").onclick=handleAction;
-document.getElementById("exit-btn").onclick=handleAction;
-
-// Cancel button logic
-cancelBtn.onclick = () => {
-  pendingUSN = null;
-  document.getElementById("entry-btn").classList.add("hidden");
-  document.getElementById("exit-btn").classList.add("hidden");
-  cancelBtn.classList.add("hidden");
-  show("📷 Ready","transparent");
-  startScanner();
-};
-
+// Start scanner
 function startScanner(){
-  show("📷 Ready","transparent");
+  show("📷 Ready to scan","transparent");
   scanner = new Html5Qrcode("scanner-box");
-  scanner.start(
-  { facingMode: "environment" },
-  { fps: 10, qrbox: 250 },
-  onScan,
-  (err) => console.error("Camera error:", err)
-);
-
+  scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScan);
 }
-navigator.mediaDevices.getUserMedia({ video: true })
-  .then(() => console.log("Camera permission granted"))
-  .catch(() => alert("Please enable camera permission"));
-
 startScanner();
 </script>
-</body></html>
+</body>
+</html>
