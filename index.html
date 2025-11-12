@@ -43,7 +43,7 @@ window.logEntry = async function(usn) {
   await set(ref(db, "attendance/" + usn + "/count"), count);
 
   // --- Optional: Send data to Google Sheets ---
-  fetch("https://script.google.com/macros/s/YOUR_SHEET_SCRIPT_ID/exec", {
+  fetch("https://script.google.com/macros/s/AKfycbzmp2-EcoIKkifmZ5b7rMkcd7tYW3Tn4GAQO4PSDD9GhfsCsA60uRLqsox0T2GkvihQ/exec", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ usn, timestamp, count })
